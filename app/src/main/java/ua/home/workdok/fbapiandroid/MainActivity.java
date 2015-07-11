@@ -6,12 +6,19 @@ import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.TextView;
+import android.widget.Toast;
 
+import com.facebook.AccessToken;
+import com.facebook.AccessTokenTracker;
 import com.facebook.CallbackManager;
 import com.facebook.FacebookCallback;
 import com.facebook.FacebookException;
 import com.facebook.FacebookSdk;
 
+import com.facebook.Profile;
+import com.facebook.ProfileTracker;
 import com.facebook.appevents.AppEventsLogger;
 import com.facebook.login.LoginResult;
 import com.facebook.login.widget.LoginButton;
@@ -19,37 +26,58 @@ import com.facebook.login.widget.LoginButton;
 
 public class MainActivity extends Activity {
 
-    CallbackManager callbackManager;
+    private CallbackManager callbackManager;
+    private AccessTokenTracker accessTokenTracker;
+    private ProfileTracker profileTracker;
+    private TextView textView;
+    private FacebookCallback<LoginResult> callback = new FacebookCallback<LoginResult>() {
+        @Override
+        public void onSuccess(LoginResult loginResult) {
+            AccessToken accessToken = loginResult.getAccessToken();
+            Profile profile = Profile.getCurrentProfile();
+            displayMessage(profile);
+        }
+
+        @Override
+        public void onCancel() {
+
+        }
+
+        @Override
+        public void onError(FacebookException e) {
+
+        }
+    };
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         FacebookSdk.sdkInitialize(getApplicationContext());
         callbackManager = CallbackManager.Factory.create();
-
-        LoginButton loginButton = (LoginButton)findViewById(R.id.login_button);
         setContentView(R.layout.activity_main);
-        loginButton.registerCallback(callbackManager, new FacebookCallback<LoginResult>() {
+        accessTokenTracker = new AccessTokenTracker() {
             @Override
-            public void onSuccess(LoginResult loginResult) {
+            protected void onCurrentAccessTokenChanged(AccessToken oldToken, AccessToken newToken) {
 
             }
-
+        };
+        profileTracker = new ProfileTracker() {
             @Override
-            public void onCancel() {
-
+            protected void onCurrentProfileChanged(Profile oldProfile, Profile newProfile) {
+                displayMessage(newProfile);
             }
-
-            @Override
-            public void onError(FacebookException e) {
-
-            }
-        });
+        };
+        textView = (TextView) findViewById(R.id.textView);
+        LoginButton loginButton = (LoginButton)findViewById(R.id.login_button);
+        loginButton.setReadPermissions("user_friends");
+        loginButton.registerCallback(callbackManager, callback);
+        accessTokenTracker.startTracking();
+        profileTracker.startTracking();
     }
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        callbackManager.onActivityResult(requestCode, resultCode, data);
-    }
+
+
+
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -73,6 +101,19 @@ public class MainActivity extends Activity {
         return super.onOptionsItemSelected(item);
     }
     @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        callbackManager.onActivityResult(requestCode, resultCode, data);
+
+    }
+    private void displayMessage(Profile profile)
+    {if(profile != null)
+    {
+        textView.setText(profile.getName());
+    }
+
+    }
+    @Override
     protected void onPause() {
         super.onPause();
 
@@ -82,8 +123,16 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-
+        Profile profile = Profile.getCurrentProfile();
+        displayMessage(profile);
         // Logs 'install' and 'app activate' App Events.
         AppEventsLogger.activateApp(this);
     }
+@Override
+    protected void onStop()
+{
+    super.onStop();
+    accessTokenTracker.stopTracking();
+    profileTracker.stopTracking();
+}
 }
